@@ -7,34 +7,38 @@ import org.pegdown.Parser;
 
 public class ConcordionPluginParser extends Parser {
 
+    private static final java.lang.String OPENING = "`";
+    private static final java.lang.String CLOSING = "}`";
+
     public ConcordionPluginParser() {
         super(ALL, 1000l, DefaultParseRunnerProvider);
     }
     
     public Rule concordionStatement() {
+//        return commandWithText();
         return FirstOf(
-            commandNoText(),
-            commandWithText()
+            commandWithText(),
+            commandNoText()
         );
     }
     
     public Rule commandWithText() {
         StringBuilderVar text = new StringBuilderVar();
         return NodeSequence(
-            "{",
-            OneOrMore(TestNot(" `"), ANY, text.append(matchedChar())),
-            " `",
-            FirstOf(setCommand(text), assertEqualsCommand(text), executeCommand(text)),
-            "`}"
+            OPENING,
+            OneOrMore(TestNot(" {"), ANY, text.append(matchedChar())),
+            " {",
+            FirstOf(setCommand(text), assertEqualsCommand(text), execute1Command(text)),
+            CLOSING
         );
     }
     
     public Rule commandNoText() {
         StringBuilderVar text = new StringBuilderVar();
         return NodeSequence(
-            "{`",
-            executeCommand(text),
-            "`}"
+            "`",
+            execute2Command(text),
+            "`"
         );
     }
     
@@ -42,7 +46,7 @@ public class ConcordionPluginParser extends Parser {
         StringBuilderVar varName = new StringBuilderVar();
         return NodeSequence(
             "#",
-            OneOrMore(TestNot("`}"), BaseParser.ANY, varName.append(matchedChar())),
+            OneOrMore(TestNot(CLOSING), BaseParser.ANY, varName.append(matchedChar())),
             push(new ConcordionSetNode(varName.getString(), text.getString()))
         );
     }
@@ -50,16 +54,26 @@ public class ConcordionPluginParser extends Parser {
     public Rule assertEqualsCommand(StringBuilderVar text) {
         StringBuilderVar expression = new StringBuilderVar();
         return NodeSequence(
-                "?=",
-                OneOrMore(TestNot("`}"), BaseParser.ANY, expression.append(matchedChar())),
+                "=",
+                OneOrMore(TestNot("?"), BaseParser.ANY, expression.append(matchedChar())),
+                "?",
                 push(new ConcordionEqualsNode(expression.getString(), text.getString()))
         );
     }
     
-    public Rule executeCommand(StringBuilderVar text) {
+    public Rule execute1Command(StringBuilderVar text) {
         StringBuilderVar expression = new StringBuilderVar();
         return NodeSequence(
-                OneOrMore(TestNot("`}"), BaseParser.ANY, expression.append(matchedChar())),
+                OneOrMore(TestNot(CLOSING), BaseParser.ANY, expression.append(matchedChar())),
+//                "?",
+                push(new ConcordionExecuteNode(expression.getString(), text.getString()))
+        );
+    }
+    
+    public Rule execute2Command(StringBuilderVar text) {
+        StringBuilderVar expression = new StringBuilderVar();
+        return NodeSequence(
+                OneOrMore(TestNot("`"), BaseParser.ANY, expression.append(matchedChar())),
                 push(new ConcordionExecuteNode(expression.getString(), text.getString()))
         );
     }
